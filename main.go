@@ -173,6 +173,8 @@ func marshalChannel(fileName string, channel *outputChannel) error {
 	enc := xml.NewEncoder(f)
 	enc.Indent("  ", "    ")
 
+	f.Write([]byte(xml.Header))
+
 	if err := enc.Encode(tmp); err != nil {
 		return fmt.Errorf("unable to marshall content due: %v", err)
 	}
