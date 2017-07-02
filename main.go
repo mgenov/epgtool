@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+const (
+	inDateLayout  = "20060102150405 -0700"
+	outDateLayout = "2006-01-02T15:04:05Z"
+)
+
 type source struct {
 	ChannelList []channel   `xml:"channel"`
 	ProgramList []programme `xml:"programme"`
@@ -60,7 +65,7 @@ func (c *channel) String() string {
 	return fmt.Sprintf("ID: %s, Name: %s, URL: %s", c.ID, c.Name.String(), c.URL)
 }
 
-type RequestedChannel struct {
+type requestedChannel struct {
 	ID   string
 	Name string
 }
@@ -115,9 +120,6 @@ func main() {
 		}
 	}
 
-	inLayout := "20060102150405 -0700"
-	outLayout := "2006-01-02T15:04:05Z"
-
 	writtenFiles := 0
 	for index, channel := range channels {
 		events, ok := channelEvents[channel.Name]
@@ -128,11 +130,11 @@ func main() {
 		outputChannel.ID = channel.ID
 		outputChannel.Name = channel.Name
 		for eventIndex, event := range events {
-			startTime, err := time.Parse(inLayout, event.Start)
+			startTime, err := time.Parse(inDateLayout, event.Start)
 			if err != nil {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
-			endTime, err := time.Parse(inLayout, event.Stop)
+			endTime, err := time.Parse(inDateLayout, event.Stop)
 			if err != nil {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
@@ -143,8 +145,8 @@ func main() {
 			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
 				ID:          id,
 				Name:        event.Title.Name,
-				StartTime:   startTime.Format(outLayout),
-				EndTime:     endTime.Format(outLayout),
+				StartTime:   startTime.Format(outDateLayout),
+				EndTime:     endTime.Format(outDateLayout),
 				Description: event.Description.Name,
 				Actors:      actors,
 				Directors:   directors,
@@ -155,10 +157,10 @@ func main() {
 		if err := marshalChannel(outputFileName, outputChannel); err != nil {
 			log.Fatalf("could not write to output file '%s' due: %v", outputFileName, err)
 		}
-		writtenFiles += 1
+		writtenFiles++
 	}
 
-	log.Printf("Written files: %d\n", writtenFiles)
+	log.Printf("Files written: %d\n", writtenFiles)
 
 }
 
@@ -187,7 +189,7 @@ func marshalChannel(fileName string, channel *outputChannel) error {
 	return nil
 }
 
-func readRequestedChannels(fileName string) []RequestedChannel {
+func readRequestedChannels(fileName string) []requestedChannel {
 	channelsFile, err := os.Open(fileName)
 	if err != nil {
 		log.Fatalf("channels file doesn't exists")
@@ -200,10 +202,10 @@ func readRequestedChannels(fileName string) []RequestedChannel {
 		log.Fatalf("could not read channels file due: %v", err)
 	}
 
-	result := make([]RequestedChannel, 0)
+	result := make([]requestedChannel, 0)
 
 	for _, rec := range channels {
-		result = append(result, RequestedChannel{ID: rec[0], Name: rec[1]})
+		result = append(result, requestedChannel{ID: rec[0], Name: rec[1]})
 	}
 	return result
 }
