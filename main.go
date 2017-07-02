@@ -65,6 +65,26 @@ type RequestedChannel struct {
 	Name string
 }
 
+type outputChannel struct {
+	ID     string       `xml:"id,attr"`
+	Name   string       `xml:"name,attr"`
+	Events outputEvents `xml:"events"`
+}
+
+type outputEvents struct {
+	Values []outputEvent `xml:"event"`
+}
+
+type outputEvent struct {
+	ID          string `xml:"id"`
+	Name        string `xml:"name"`
+	Description string `xml:"description"`
+	StartTime   string `xml:"time-from"`
+	EndTime     string `xml:"time-till"`
+	Actors      string `xml:"actors,omitempty"`
+	Directors   string `xml:"directors,omitempty"`
+}
+
 func main() {
 	f, err := os.Open("source.xml")
 	if err != nil {
@@ -95,7 +115,6 @@ func main() {
 		}
 	}
 
-	// layout := "2006-01-02T15:04:05.000Z"
 	inLayout := "20060102150405 -0700"
 	outLayout := "2006-01-02T15:04:05Z"
 
@@ -141,26 +160,6 @@ func main() {
 
 	log.Printf("Written files: %d\n", writtenFiles)
 
-}
-
-type outputChannel struct {
-	ID     string       `xml:"id,attr"`
-	Name   string       `xml:"name,attr"`
-	Events outputEvents `xml:"events"`
-}
-
-type outputEvents struct {
-	Values []outputEvent `xml:"event"`
-}
-
-type outputEvent struct {
-	ID          string `xml:"id"`
-	Name        string `xml:"name"`
-	Description string `xml:"description"`
-	StartTime   string `xml:"time-from"`
-	EndTime     string `xml:"time-till"`
-	Actors      string `xml:"actors,omitempty"`
-	Directors   string `xml:"directors,omitempty"`
 }
 
 func marshalChannel(fileName string, channel *outputChannel) error {
