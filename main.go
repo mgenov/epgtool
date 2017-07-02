@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -37,6 +38,7 @@ type programme struct {
 	Start         string  `xml:"start,attr"`
 	Stop          string  `xml:"stop,attr"`
 	ChannelName   string  `xml:"channel,attr"`
+	Description   title   `xml:"desc"`
 	Title         title   `xml:"title"`
 	Credits       credits `xml:"credits"`
 	Date          string  `xml:"date"`
@@ -46,8 +48,8 @@ type programme struct {
 }
 
 type credits struct {
-	Producers []name `xml:"producer"`
-	Actors    []name `xml:"actor"`
+	Producers []string `xml:"producer"`
+	Actors    []string `xml:"actor"`
 }
 
 type name struct {
@@ -71,7 +73,6 @@ func main() {
 	defer f.Close()
 
 	channels := readRequestedChannels("channels.csv")
-	fmt.Println(len(channels))
 
 	b, err := ioutil.ReadAll(f)
 	if err != nil {
@@ -98,6 +99,7 @@ func main() {
 	inLayout := "20060102150405 -0700"
 	outLayout := "2006-01-02T15:04:05Z"
 
+	writtenFiles := 0
 	for index, channel := range channels {
 		events, ok := channelEvents[channel.Name]
 		if !ok {
@@ -106,9 +108,6 @@ func main() {
 		outputChannel := &outputChannel{Events: outputEvents{Values: make([]outputEvent, 0)}}
 		outputChannel.ID = channel.ID
 		outputChannel.Name = channel.Name
-		// outputFile := os.Open(fmt.Sprintf("n_events_%d.xml", counter))
-		// 20170701000000 +0300]
-		fmt.Printf("Channel: %v\n", channel)
 		for eventIndex, event := range events {
 			startTime, err := time.Parse(inLayout, event.Start)
 			if err != nil {
@@ -118,24 +117,29 @@ func main() {
 			if err != nil {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
-
-			fmt.Printf("     [%v][%s] - %s\n", startTime, endTime.Format(outLayout), event.Title.Name)
 			id := fmt.Sprintf("%d", (index+1)*1000+eventIndex)
+			actors := strings.Join(event.Credits.Actors, ", ")
+			directors := strings.Join(event.Credits.Producers, ", ")
 
 			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
 				ID:          id,
+				Name:        event.Title.Name,
 				StartTime:   startTime.Format(outLayout),
 				EndTime:     endTime.Format(outLayout),
-				Description: event.Title.Name,
+				Description: event.Description.Name,
+				Actors:      actors,
+				Directors:   directors,
 			})
 		}
 
-		fmt.Println("==============================")
 		outputFileName := fmt.Sprintf("n_events_%s.xml", channel.ID)
 		if err := marshalChannel(outputFileName, outputChannel); err != nil {
 			log.Fatalf("could not write to output file '%s' due: %v", outputFileName, err)
 		}
+		writtenFiles += 1
 	}
+
+	log.Printf("Written files: %d\n", writtenFiles)
 
 }
 
@@ -155,6 +159,8 @@ type outputEvent struct {
 	Description string `xml:"description"`
 	StartTime   string `xml:"time-from"`
 	EndTime     string `xml:"time-till"`
+	Actors      string `xml:"actors,omitempty"`
+	Directors   string `xml:"directors,omitempty"`
 }
 
 func marshalChannel(fileName string, channel *outputChannel) error {
