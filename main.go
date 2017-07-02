@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/csv"
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -14,6 +16,12 @@ import (
 const (
 	inDateLayout  = "20060102150405 -0700"
 	outDateLayout = "2006-01-02T15:04:05Z"
+)
+
+var (
+	sourceFile   = flag.String("sourceFile", "source.xml", "the source file name")
+	channelsFile = flag.String("channelsFile", "channels.csv", "the mapping file for the channels")
+	outputDir    = flag.String("outputDir", ".", "output directory where result will be written")
 )
 
 type source struct {
@@ -91,7 +99,9 @@ type outputEvent struct {
 }
 
 func main() {
-	f, err := os.Open("source.xml")
+	flag.Parse()
+
+	f, err := os.Open(*sourceFile)
 	if err != nil {
 		log.Fatalf("could not read source file: %v", err)
 	}
@@ -153,7 +163,13 @@ func main() {
 			})
 		}
 
-		outputFileName := fmt.Sprintf("n_events_%s.xml", channel.ID)
+		if _, err := os.Stat(*outputDir); os.IsNotExist(err) {
+			if err := os.MkdirAll(*outputDir, os.ModePerm); err != nil {
+				log.Fatalf("unable to create output directory due: %v", err)
+			}
+		}
+
+		outputFileName := filepath.Join(*outputDir, fmt.Sprintf("n_events_%s.xml", channel.ID))
 		if err := marshalChannel(outputFileName, outputChannel); err != nil {
 			log.Fatalf("could not write to output file '%s' due: %v", outputFileName, err)
 		}
