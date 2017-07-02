@@ -48,16 +48,16 @@ type channel struct {
 //     <title lang="bg">Добро утро, българи</title>
 //   </programme>
 type programme struct {
-	Start         string  `xml:"start,attr"`
-	Stop          string  `xml:"stop,attr"`
-	ChannelName   string  `xml:"channel,attr"`
-	Description   title   `xml:"desc"`
-	Title         title   `xml:"title"`
-	Credits       credits `xml:"credits"`
-	Date          string  `xml:"date"`
-	Category      title   `xml:"category"`
-	Country       string  `xml:"country"`
-	EpisodeNumber string  `xml:"episode-num"`
+	Start         string   `xml:"start,attr"`
+	Stop          string   `xml:"stop,attr"`
+	ChannelName   string   `xml:"channel,attr"`
+	Description   title    `xml:"desc"`
+	Title         title    `xml:"title"`
+	Credits       credits  `xml:"credits"`
+	Date          string   `xml:"date"`
+	Category      title    `xml:"category"`
+	Country       []string `xml:"country"`
+	EpisodeNumber string   `xml:"episode-num"`
 }
 
 type credits struct {
@@ -89,13 +89,15 @@ type outputEvents struct {
 }
 
 type outputEvent struct {
-	ID          string `xml:"id"`
-	Name        string `xml:"name"`
-	Description string `xml:"description"`
-	StartTime   string `xml:"time-from"`
-	EndTime     string `xml:"time-till"`
-	Actors      string `xml:"actors,omitempty"`
-	Directors   string `xml:"directors,omitempty"`
+	ID                  string `xml:"id"`
+	Name                string `xml:"name"`
+	Description         string `xml:"description"`
+	StartTime           string `xml:"time-from"`
+	EndTime             string `xml:"time-till"`
+	Actors              string `xml:"actors,omitempty"`
+	Directors           string `xml:"directors,omitempty"`
+	ProductionYear      string `xml:"production_year,omitempty"`
+	ProductionCountries string `xml:"production_countries,omitempty"`
 }
 
 func main() {
@@ -151,15 +153,18 @@ func main() {
 			id := fmt.Sprintf("%d", (index+1)*1000+eventIndex)
 			actors := strings.Join(event.Credits.Actors, ", ")
 			directors := strings.Join(event.Credits.Producers, ", ")
+			countries := strings.Join(event.Country, ", ")
 
 			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
-				ID:          id,
-				Name:        event.Title.Name,
-				StartTime:   startTime.Format(outDateLayout),
-				EndTime:     endTime.Format(outDateLayout),
-				Description: event.Description.Name,
-				Actors:      actors,
-				Directors:   directors,
+				ID:                  id,
+				Name:                event.Title.Name,
+				StartTime:           startTime.Format(outDateLayout),
+				EndTime:             endTime.Format(outDateLayout),
+				Description:         event.Description.Name,
+				Actors:              actors,
+				Directors:           directors,
+				ProductionYear:      event.Date,
+				ProductionCountries: countries,
 			})
 		}
 
