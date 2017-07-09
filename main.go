@@ -91,7 +91,7 @@ type outputEvents struct {
 type outputEvent struct {
 	ID                  string `xml:"id"`
 	Name                string `xml:"name"`
-	Description         string `xml:"description"`
+	Description         string `xml:"description,omitempty"`
 	StartTime           string `xml:"time-from"`
 	EndTime             string `xml:"time-till"`
 	Actors              string `xml:"actors,omitempty"`
@@ -141,7 +141,7 @@ func main() {
 		outputChannel := &outputChannel{Events: outputEvents{Values: make([]outputEvent, 0)}}
 		outputChannel.ID = channel.ID
 		outputChannel.Name = channel.Name
-		for eventIndex, event := range events {
+		for _, event := range events {
 			startTime, err := time.Parse(inDateLayout, event.Start)
 			if err != nil {
 				log.Fatalf("could not parse start time due: %v", err)
@@ -150,7 +150,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
-			id := fmt.Sprintf("%d", (index+1)*1000+eventIndex)
+			id := fmt.Sprintf("%d%d%d%d%d%d", index, startTime.Year(), startTime.Month(), startTime.Day(), startTime.Hour(), startTime.Minute())
 			actors := strings.Join(event.Credits.Actors, ", ")
 			directors := strings.Join(event.Credits.Producers, ", ")
 			countries := strings.Join(event.Country, ", ")
