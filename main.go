@@ -137,7 +137,7 @@ func main() {
 	}
 
 	writtenFiles := 0
-	for index, channel := range channels {
+	for _, channel := range channels {
 		events, ok := channelEvents[channel.Name]
 		if !ok {
 			continue
@@ -154,7 +154,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
-			id := fmt.Sprintf("%d%d%d%d%d%d", index, startTime.Year(), startTime.Month(), startTime.Day(), startTime.Hour(), startTime.Minute())
+			id := fmt.Sprintf("%s%d%d%d%d%d", channel.ID, startTime.Year(), startTime.Month(), startTime.Day(), startTime.Hour(), startTime.Minute())
 			actors := strings.Join(event.Credits.Actors, ", ")
 			directors := strings.Join(event.Credits.Producers, ", ")
 			countries := strings.Join(event.Country, ", ")
