@@ -78,9 +78,13 @@ type requestedChannel struct {
 	Name string
 }
 
+type epg struct {
+	Channel *outputChannel `xml:"channel"`
+}
+
 type outputChannel struct {
-	ID     string       `xml:"id,attr"`
 	Name   string       `xml:"name,attr"`
+	ID     string       `xml:"id,attr"`
 	Events outputEvents `xml:"events"`
 }
 
@@ -91,9 +95,9 @@ type outputEvents struct {
 type outputEvent struct {
 	ID                  string `xml:"id"`
 	Name                string `xml:"name"`
+	StartTime           string `xml:"time_from"`
+	EndTime             string `xml:"time_till"`
 	Description         string `xml:"description,omitempty"`
-	StartTime           string `xml:"time-from"`
-	EndTime             string `xml:"time-till"`
 	Actors              string `xml:"actors,omitempty"`
 	Directors           string `xml:"directors,omitempty"`
 	ProductionYear      string `xml:"production_year,omitempty"`
@@ -193,10 +197,11 @@ func marshalChannel(fileName string, channel *outputChannel) error {
 	}
 	defer f.Close()
 
+	out := &epg{channel}
 	tmp := struct {
-		outputChannel
-		XMLName struct{} `xml:"channel"`
-	}{outputChannel: *channel}
+		epg
+		XMLName struct{} `xml:"epg"`
+	}{epg: *out}
 
 	enc := xml.NewEncoder(f)
 	enc.Indent("  ", "    ")
