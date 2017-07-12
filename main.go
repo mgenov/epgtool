@@ -78,10 +78,6 @@ type requestedChannel struct {
 	Name string
 }
 
-type epg struct {
-	Channel *outputChannel `xml:"channel"`
-}
-
 type outputChannel struct {
 	Name   string       `xml:"name,attr"`
 	ID     string       `xml:"id,attr"`
@@ -197,11 +193,10 @@ func marshalChannel(fileName string, channel *outputChannel) error {
 	}
 	defer f.Close()
 
-	out := &epg{channel}
 	tmp := struct {
-		epg
-		XMLName struct{} `xml:"epg"`
-	}{epg: *out}
+		outputChannel
+		XMLName struct{} `xml:"channel"`
+	}{outputChannel: *channel}
 
 	enc := xml.NewEncoder(f)
 	enc.Indent("  ", "    ")
