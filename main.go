@@ -133,6 +133,7 @@ func main() {
 	}
 
 	writtenFiles := 0
+	ids := make(map[string]programme)
 	for index, channel := range channels {
 		events, ok := channelEvents[channel.Name]
 		if !ok {
@@ -151,7 +152,14 @@ func main() {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
 
-			id := fmt.Sprintf("%s%d%d%d%d%d%d", channel.ID, startTime.Year(), startTime.Month(), startTime.Day(), startTime.Hour(), startTime.Minute(), index)
+			id := fmt.Sprintf("%s%d%d%d%d%d%d%d%d%d%d%d%d", channel.ID, startTime.Year(), startTime.Month(), startTime.Day(), startTime.Hour(), startTime.Minute(), index, endTime.Year(), endTime.Month(), endTime.Day(), endTime.Hour(), endTime.Minute(), endTime.Second())
+
+			v, ok := ids[id]
+			if !ok {
+				ids[id] = event
+			} else {
+				fmt.Printf("duplication: %s - \n%v\n%v\n", id, v, event)
+			}
 
 			actors := strings.Join(event.Credits.Actors, ", ")
 			directors := strings.Join(event.Credits.Producers, ", ")
