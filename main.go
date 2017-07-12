@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -152,7 +153,11 @@ func main() {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
 
-			id := fmt.Sprintf("%s%d%d%d%d%d%d%d%d%d%d%d%d", channel.ID, startTime.Year(), startTime.Month(), startTime.Day(), startTime.Hour(), startTime.Minute(), index, endTime.Year(), endTime.Month(), endTime.Day(), endTime.Hour(), endTime.Minute(), endTime.Second())
+			id := fmt.Sprintf("%s%d%d", channel.ID, index, startTime.Unix())
+			_, err = strconv.ParseInt(id, 10, 64)
+			if err != nil {
+				log.Fatal(err)
+			}
 
 			v, ok := ids[id]
 			if !ok {
