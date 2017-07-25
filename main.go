@@ -94,6 +94,7 @@ type outputEvent struct {
 	Name                string `xml:"name"`
 	StartTime           string `xml:"time_from"`
 	EndTime             string `xml:"time_till"`
+	Perex               string `xml:"perex,omitempty"`
 	Description         string `xml:"description,omitempty"`
 	Actors              string `xml:"actors,omitempty"`
 	Directors           string `xml:"directors,omitempty"`
@@ -164,6 +165,7 @@ func main() {
 				ids[id] = event
 			} else {
 				fmt.Printf("duplication: %s - \n%v\n%v\n", id, v, event)
+				continue
 			}
 
 			actors := strings.Join(event.Credits.Actors, ", ")
@@ -175,6 +177,7 @@ func main() {
 				Name:                event.Title.Name,
 				StartTime:           startTime.Format(outDateLayout),
 				EndTime:             endTime.Format(outDateLayout),
+				Perex:               event.Description.Name,
 				Description:         event.Description.Name,
 				Actors:              actors,
 				Directors:           directors,
