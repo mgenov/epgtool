@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -94,7 +93,6 @@ type outputEvent struct {
 	Name                string `xml:"name"`
 	StartTime           string `xml:"time_from"`
 	EndTime             string `xml:"time_till"`
-	Perex               string `xml:"perex,omitempty"`
 	Description         string `xml:"description,omitempty"`
 	Actors              string `xml:"actors,omitempty"`
 	Directors           string `xml:"directors,omitempty"`
@@ -136,6 +134,7 @@ func main() {
 
 	writtenFiles := 0
 	ids := make(map[string]programme)
+	event_id_base := time.Now().UTC().Unix() / 1024
 	for index, channel := range channels {
 		events, ok := channelEvents[channel.Name]
 		if !ok {
@@ -154,18 +153,14 @@ func main() {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
 
-			id := fmt.Sprintf("%s%d%d", channel.ID, index, startTime.Unix())
-			_, err = strconv.ParseInt(id, 10, 64)
-			if err != nil {
-				log.Fatal(err)
-			}
+			event_id_base++
+			id := fmt.Sprintf("%d", event_id_base + int64(index))
 
 			v, ok := ids[id]
 			if !ok {
 				ids[id] = event
 			} else {
 				fmt.Printf("duplication: %s - \n%v\n%v\n", id, v, event)
-				continue
 			}
 
 			actors := strings.Join(event.Credits.Actors, ", ")
@@ -175,9 +170,8 @@ func main() {
 			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
 				ID:                  id,
 				Name:                event.Title.Name,
-				StartTime:           startTime.Format(outDateLayout),
-				EndTime:             endTime.Format(outDateLayout),
-				Perex:               event.Description.Name,
+				StartTime:           startTime.UTC().Format(outDateLayout),
+				EndTime:             endTime.UTC().Format(outDateLayout),
 				Description:         event.Description.Name,
 				Actors:              actors,
 				Directors:           directors,
@@ -192,7 +186,7 @@ func main() {
 			}
 		}
 
-		outputFileName := filepath.Join(*outputDir, fmt.Sprintf("n_events_%s.xml", channel.ID))
+		outputFileName := filepath.Join(*outputDir, fmt.Sprintf("%s.xml", channel.ID))
 		if err := marshalChannel(outputFileName, outputChannel); err != nil {
 			log.Fatalf("could not write to output file '%s' due: %v", outputFileName, err)
 		}
