@@ -136,6 +136,9 @@ func main() {
 
 	writtenFiles := 0
 	ids := make(map[string]programme)
+
+        event_id_base := time.Now().UTC().Unix() / 1024
+
 	for index, channel := range channels {
 		events, ok := channelEvents[channel.Name]
 		if !ok {
@@ -154,11 +157,8 @@ func main() {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
 
-			id := fmt.Sprintf("%s%d%d", channel.ID, index, startTime.Unix())
-			_, err = strconv.ParseInt(id, 10, 64)
-			if err != nil {
-				log.Fatal(err)
-			}
+                        event_id_base++
+                        id := fmt.Sprintf("%d", event_id_base + int64(index))
 
 			v, ok := ids[id]
 			if !ok {
@@ -172,11 +172,19 @@ func main() {
 			directors := strings.Join(event.Credits.Producers, ", ")
 			countries := strings.Join(event.Country, ", ")
 
+                        var t = event.Title[0]
+
+                        for i, title := range event.Title {
+                                if title.Lang == "bg" {
+                                        t = event.Title[i]
+                                }
+                        }
+
 			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
 				ID:                  id,
 				Name:                event.Title.Name,
-				StartTime:           startTime.Format(outDateLayout),
-				EndTime:             endTime.Format(outDateLayout),
+				StartTime:           startTime.UTC().Format(outDateLayout),
+				EndTime:             endTime.UTC().Format(outDateLayout),
 				Perex:               event.Description.Name,
 				Description:         event.Description.Name,
 				Actors:              actors,
