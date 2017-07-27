@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -53,7 +52,7 @@ type programme struct {
 	Stop          string   `xml:"stop,attr"`
 	ChannelName   string   `xml:"channel,attr"`
 	Description   title    `xml:"desc"`
-	Title         title    `xml:"title"`
+	Title         []title    `xml:"title"`
 	Credits       credits  `xml:"credits"`
 	Date          string   `xml:"date"`
 	Category      title    `xml:"category"`
@@ -182,7 +181,7 @@ func main() {
 
 			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
 				ID:                  id,
-				Name:                event.Title.Name,
+				Name:                t.Name,
 				StartTime:           startTime.UTC().Format(outDateLayout),
 				EndTime:             endTime.UTC().Format(outDateLayout),
 				Perex:               event.Description.Name,
