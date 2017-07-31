@@ -52,7 +52,7 @@ type programme struct {
 	Stop          string   `xml:"stop,attr"`
 	ChannelName   string   `xml:"channel,attr"`
 	Description   title    `xml:"desc"`
-	Title         []title    `xml:"title"`
+	Title         []title  `xml:"title"`
 	Credits       credits  `xml:"credits"`
 	Date          string   `xml:"date"`
 	Category      title    `xml:"category"`
@@ -136,7 +136,9 @@ func main() {
 	writtenFiles := 0
 	ids := make(map[string]programme)
 
-        event_id_base := time.Now().UTC().Unix() / 1024
+	// Use system time for index as source may contain duplicated events
+	// and this guarantees uniqueness.
+	eventIndex := time.Now().UTC().Unix() / 1024
 
 	for index, channel := range channels {
 		events, ok := channelEvents[channel.Name]
@@ -156,8 +158,8 @@ func main() {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
 
-                        event_id_base++
-                        id := fmt.Sprintf("%d", event_id_base + int64(index))
+			eventIndex++
+			id := fmt.Sprintf("%d", eventIndex+int64(index))
 
 			v, ok := ids[id]
 			if !ok {
@@ -171,13 +173,13 @@ func main() {
 			directors := strings.Join(event.Credits.Producers, ", ")
 			countries := strings.Join(event.Country, ", ")
 
-                        var t = event.Title[0]
+			var t = event.Title[0]
 
-                        for i, title := range event.Title {
-                                if title.Lang == "bg" {
-                                        t = event.Title[i]
-                                }
-                        }
+			for i, title := range event.Title {
+				if title.Lang == "bg" {
+					t = event.Title[i]
+				}
+			}
 
 			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
 				ID:                  id,
