@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -201,6 +202,7 @@ func main() {
 			}
 		}
 
+		sort.Sort(byStartTime(outputChannel.Events.Values))
 		outputFileName := filepath.Join(*outputDir, fmt.Sprintf("n_events_%s.xml", channel.ID))
 		if err := marshalChannel(outputFileName, outputChannel); err != nil {
 			log.Fatalf("could not write to output file '%s' due: %v", outputFileName, err)
@@ -211,6 +213,12 @@ func main() {
 	log.Printf("Files written: %d\n", writtenFiles)
 
 }
+
+type byStartTime []outputEvent
+
+func (a byStartTime) Len() int           { return len(a) }
+func (a byStartTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byStartTime) Less(i, j int) bool { return a[i].StartTime < a[j].StartTime }
 
 func marshalChannel(fileName string, channel *outputChannel) error {
 	f, err := os.Create(fileName)
