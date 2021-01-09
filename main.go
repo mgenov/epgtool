@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	timespan "github.com/senseyeio/spaniel"
 )
 
 const (
@@ -20,7 +23,7 @@ const (
 )
 
 var (
-	sourceFile   = flag.String("sourceFile", "source.xml", "the source file name")
+	sourceURL    = flag.String("sourceURL", "https://epg-web.thezone.bg:8484/epg.xmltv", "the source url")
 	channelsFile = flag.String("channelsFile", "channels.csv", "the mapping file for the channels")
 	outputDir    = flag.String("outputDir", ".", "output directory where result will be written")
 )
@@ -46,7 +49,7 @@ type channel struct {
 }
 
 // <programme start="20170701080000 +0300" stop="20170701100000 +0300" channel="Alfa">
-//     <title lang="bg">Добро утро, българи</title>
+//     <title lang="bg">~Tоб~@о ~C~B~@о, б~Jлга~@и</title>
 //   </programme>
 type programme struct {
 	Start         string   `xml:"start,attr"`
@@ -88,7 +91,6 @@ type outputChannel struct {
 type outputEvents struct {
 	Values []outputEvent `xml:"event"`
 }
-
 type outputEvent struct {
 	ID                  string `xml:"id"`
 	Name                string `xml:"name"`
@@ -102,30 +104,36 @@ type outputEvent struct {
 	ProductionCountries string `xml:"production_countries,omitempty"`
 }
 
-func main() {
-	flag.Parse()
-
-	f, err := os.Open(*sourceFile)
+func fetchSource() (*source, error) {
+	resp, err := http.Get(*sourceURL)
 	if err != nil {
-		log.Fatalf("could not read source file: %v", err)
+		return nil, fmt.Errorf("could not read sources from: %s due %v", *sourceURL, err)
 	}
-	defer f.Close()
+	defer resp.Body.Close()
 
-	channels := readRequestedChannels("channels.csv")
-
-	b, err := ioutil.ReadAll(f)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatalf("could not read source content: %v", err)
 	}
 	var s source
 	err = xml.Unmarshal(b, &s)
 	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func main() {
+	flag.Parse()
+	channels := readRequestedChannels("channels.csv")
+
+	s, err := fetchSource()
+	if err != nil {
 		log.Fatal(err)
 	}
 
 	channelEvents := make(map[string][]programme)
 	for _, e := range s.ProgramList {
-
 		v, ok := channelEvents[e.ChannelName]
 		if !ok {
 			channelEvents[e.ChannelName] = []programme{e}
@@ -136,12 +144,7 @@ func main() {
 
 	writtenFiles := 0
 	ids := make(map[string]programme)
-
-	// Use system time for index as source may contain duplicated events
-	// and this guarantees uniqueness.
-	eventIndex := time.Now().UTC().Unix() / 1024
-
-	for index, channel := range channels {
+	for _, channel := range channels {
 		events, ok := channelEvents[channel.Name]
 		if !ok {
 			continue
@@ -149,6 +152,8 @@ func main() {
 		outputChannel := &outputChannel{Events: outputEvents{Values: make([]outputEvent, 0)}}
 		outputChannel.ID = channel.ID
 		outputChannel.Name = channel.Name
+		spans := timespan.Spans{}
+
 		for _, event := range events {
 			startTime, err := time.Parse(inDateLayout, event.Start)
 			if err != nil {
@@ -159,15 +164,16 @@ func main() {
 				log.Fatalf("could not parse start time due: %v", err)
 			}
 
-			eventIndex++
-			id := fmt.Sprintf("%d", eventIndex+int64(index))
+			id := fmt.Sprintf("%d", startTime.UTC().Unix())
+			idc := fmt.Sprintf("%s-%s", id, event.ChannelName)
 
-			v, ok := ids[id]
+			v, ok := ids[idc]
 			if !ok {
-				ids[id] = event
+				ids[idc] = event
 			} else {
-				fmt.Printf("duplication: %s - \n%v\n%v\n", id, v, event)
-				continue
+				if v.ChannelName == event.ChannelName {
+					continue
+				}
 			}
 
 			actors := strings.Join(event.Credits.Actors, ", ")
@@ -180,6 +186,21 @@ func main() {
 				if title.Lang == "bg" {
 					t = event.Title[i]
 				}
+			}
+
+			overlaps := spans.IntersectionBetween(timespan.Spans{
+				timespan.New(startTime, endTime),
+			})
+
+			if len(overlaps) > 0 {
+				fmt.Println("collision detected")
+				fmt.Printf("   %s channel=\"%s\" start=\"%s\" stop=\"%s\"\n", channel.ID, channel.Name, event.Start, event.Stop)
+				fmt.Println("   startTime: ", event.Start)
+				fmt.Println("   endTime  : ", event.Stop)
+				fmt.Println("event skipped")
+				continue
+			} else {
+				spans = append(spans, timespan.New(startTime, endTime))
 			}
 
 			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
@@ -196,13 +217,14 @@ func main() {
 			})
 		}
 
+		sort.Sort(byStartTime(outputChannel.Events.Values))
+
 		if _, err := os.Stat(*outputDir); os.IsNotExist(err) {
 			if err := os.MkdirAll(*outputDir, os.ModePerm); err != nil {
 				log.Fatalf("unable to create output directory due: %v", err)
 			}
 		}
 
-		sort.Sort(byStartTime(outputChannel.Events.Values))
 		outputFileName := filepath.Join(*outputDir, fmt.Sprintf("n_events_%s.xml", channel.ID))
 		if err := marshalChannel(outputFileName, outputChannel); err != nil {
 			log.Fatalf("could not write to output file '%s' due: %v", outputFileName, err)
@@ -218,7 +240,7 @@ type byStartTime []outputEvent
 
 func (a byStartTime) Len() int           { return len(a) }
 func (a byStartTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byStartTime) Less(i, j int) bool { return a[i].StartTime < a[j].StartTime }
+func (a byStartTime) Less(i, j int) bool { return a[i].ID < a[j].ID }
 
 func marshalChannel(fileName string, channel *outputChannel) error {
 	f, err := os.Create(fileName)
