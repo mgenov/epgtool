@@ -5,9 +5,7 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,9 +21,11 @@ const (
 )
 
 var (
-	sourceURL    = flag.String("sourceURL", "https://epg-web.thezone.bg:8484/epg.xmltv", "the source url")
-	channelsFile = flag.String("channelsFile", "channels.csv", "the mapping file for the channels")
-	outputDir    = flag.String("outputDir", ".", "output directory where result will be written")
+	dataDir          = flag.String("dataDir", "data", "data directory")
+	sourceFileLimit  = flag.Int("sourceFileLimit", 5, "the maximum number of files to be read")
+	sourceFilePrefix = flag.String("sourcePrefix", "CMS", "prefixed used to filter specific source files, e.g CMS-20210114")
+	channelsFile     = flag.String("channelsFile", "channels.csv", "the mapping file for the channels")
+	outputDir        = flag.String("outputDir", ".", "output directory where result will be written")
 )
 
 type source struct {
@@ -104,44 +104,71 @@ type outputEvent struct {
 	ProductionCountries string `xml:"production_countries,omitempty"`
 }
 
-func fetchSource() (*source, error) {
-	resp, err := http.Get(*sourceURL)
-	if err != nil {
-		return nil, fmt.Errorf("could not read sources from: %s due %v", *sourceURL, err)
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("could not read source content: %v", err)
-	}
-	var s source
-	err = xml.Unmarshal(b, &s)
+func listSourceFiles(dataDir string, filePrefix string, lastN int) ([]string, error) {
+	var files []string
+	err := filepath.Walk(dataDir, func(path string, info os.FileInfo, err error) error {
+		if filePrefix == "" || strings.HasPrefix(info.Name(), filePrefix) {
+			files = append(files, path)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &s, nil
+
+	sort.Strings(files)
+	sort.Sort(sort.Reverse(sort.StringSlice(files)))
+	if len(files) >= lastN {
+		return files[0:lastN], nil
+	}
+	return files, nil
+}
+
+func readSources(files []string) []source {
+	var result []source
+	for _, fname := range files {
+		f, err := os.Open(fname)
+		if err != nil {
+			panic(err)
+		}
+
+		var s source
+		err = xml.NewDecoder(f).Decode(&s)
+		if err != nil {
+			panic(err)
+		}
+
+		result = append(result, s)
+	}
+
+	return result
 }
 
 func main() {
 	flag.Parse()
 	channels := readRequestedChannels("channels.csv")
 
-	s, err := fetchSource()
+	files, err := listSourceFiles(*dataDir, *sourceFilePrefix, *sourceFileLimit)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	sources := readSources(files)
+
 	channelEvents := make(map[string][]programme)
-	for _, e := range s.ProgramList {
-		v, ok := channelEvents[e.ChannelName]
-		if !ok {
-			channelEvents[e.ChannelName] = []programme{e}
-		} else {
-			channelEvents[e.ChannelName] = append(v, e)
+	for _, s := range sources {
+		for _, e := range s.ProgramList {
+			v, ok := channelEvents[e.ChannelName]
+			if !ok {
+				channelEvents[e.ChannelName] = []programme{e}
+			} else {
+				channelEvents[e.ChannelName] = append(v, e)
+			}
 		}
 	}
-
+	fmt.Println("Source file count: ", len(files))
+	fmt.Println("Channels: ", len(channels))
+	fmt.Println("Events: ", len(channelEvents))
 	writtenFiles := 0
 	ids := make(map[string]programme)
 	for _, channel := range channels {
@@ -153,7 +180,7 @@ func main() {
 		outputChannel.ID = channel.ID
 		outputChannel.Name = channel.Name
 		spans := timespan.Spans{}
-
+		eventByStartTime := make(map[string]outputEvent)
 		for _, event := range events {
 			startTime, err := time.Parse(inDateLayout, event.Start)
 			if err != nil {
@@ -195,6 +222,12 @@ func main() {
 			if len(overlaps) > 0 {
 				fmt.Println("collision detected")
 				fmt.Printf("   %s channel=\"%s\" start=\"%s\" stop=\"%s\"\n", channel.ID, channel.Name, event.Start, event.Stop)
+				existing, ok := eventByStartTime[endTime.UTC().Format(outDateLayout)]
+
+				if ok {
+					fmt.Println("   event desc: ", existing.Description)
+				}
+				fmt.Println("   skip desc: ", event.Description.Name)
 				fmt.Println("   startTime: ", event.Start)
 				fmt.Println("   endTime  : ", event.Stop)
 				fmt.Println("event skipped")
@@ -203,7 +236,7 @@ func main() {
 				spans = append(spans, timespan.New(startTime, endTime))
 			}
 
-			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent{
+			outputEvent := outputEvent{
 				ID:                  id,
 				Name:                t.Name,
 				StartTime:           startTime.UTC().Format(outDateLayout),
@@ -214,7 +247,11 @@ func main() {
 				Directors:           directors,
 				ProductionYear:      event.Date,
 				ProductionCountries: countries,
-			})
+			}
+
+			eventByStartTime[endTime.UTC().Format(outDateLayout)] = outputEvent
+
+			outputChannel.Events.Values = append(outputChannel.Events.Values, outputEvent)
 		}
 
 		sort.Sort(byStartTime(outputChannel.Events.Values))
@@ -232,7 +269,7 @@ func main() {
 		writtenFiles++
 	}
 
-	log.Printf("Files written: %d\n", writtenFiles)
+	log.Printf("Created files: %d\n", writtenFiles)
 
 }
 
